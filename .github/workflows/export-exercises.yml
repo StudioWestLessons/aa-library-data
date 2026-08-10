@@ -1,11 +1,12 @@
-name: Export AA Library from Notion
+name: Export Exercise Library from Google Docs
 
 on:
   schedule:
-    # Daily, ~6:07am Pacific (13:07 UTC during PDT). Off the :00 mark per
-    # GitHub's cron guidance. The weekly sync-check in studio-west-resources
-    # runs 1h+ after this so a fresh Notion edit isn't flagged as drift.
-    - cron: '7 13 * * *'
+    # Daily, ~6:23am Pacific (13:23 UTC during PDT). Off the :00 mark per
+    # GitHub's cron guidance, and offset from the AA library export at 13:07
+    # so the two don't contend. The weekly sync-check in studio-west-resources
+    # runs many hours later so a fresh doc edit isn't flagged as drift.
+    - cron: '23 13 * * *'
   workflow_dispatch: {}
 
 permissions:
@@ -22,10 +23,10 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Export from Notion
+      - name: Export from the Google Doc
         id: export
         run: |
-          output=$(python3 export_aa.py)
+          output=$(python3 export_exercises.py)
           echo "$output"
           echo "result=$(echo "$output" | head -1)" >> "$GITHUB_OUTPUT"
           echo "summary=$(echo "$output" | tail -n +2)" >> "$GITHUB_OUTPUT"
@@ -35,8 +36,8 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add aa-library.json
-          git commit -m "Update AA library data from Notion: ${{ steps.export.outputs.summary }}"
+          git add exercise-library.json
+          git commit -m "Update exercise library data from the doc: ${{ steps.export.outputs.summary }}"
           # Two exports write to this repo (AA at 13:07, exercises at 13:23);
           # rebase first so a same-window commit from the other one can't
           # turn this into a rejected push.
@@ -49,10 +50,10 @@ jobs:
           # This repo is public, and GitHub disables scheduled workflows in
           # public repos after 60 days without repository activity — and the
           # warning email it sends first never arrives (email delivery to
-          # this account is broken account-wide). Data commits reset the
-          # clock, but they only happen when Notion changed; if the library
-          # has been quiet for 45+ days, commit a dated stamp instead so the
-          # daily export can never be switched off for inactivity.
+          # this account is broken account-wide). Data commits only happen
+          # when the doc changed, so if the library has been quiet for 45+
+          # days, commit a dated stamp instead; the daily export can then
+          # never be switched off for inactivity.
           last=$(git log -1 --format=%ct)
           now=$(date +%s)
           days=$(( (now - last) / 86400 ))
@@ -74,10 +75,10 @@ jobs:
           # @mention + assignee so GitHub Mobile pushes this to Greg's phone
           # (account-wide email delivery is broken; mobile push only fires for
           # direct interactions). Don't remove them.
-          title="AA Library export is failing"
+          title="Exercise Library export is failing"
           existing=$(gh issue list --repo "${{ github.repository }}" --state open \
             --json number,title --jq ".[] | select(.title == \"$title\") | .number" | head -1)
-          body="@${{ github.repository_owner }} — the daily Notion → aa-library.json export failed. The site keeps showing the last good data, but it will NOT pick up new Notion edits until this is fixed.
+          body="@${{ github.repository_owner }} — the daily Google Doc → exercise-library.json export failed. The site keeps showing the last good data, but it will NOT pick up new doc edits until this is fixed. The most likely cause is the doc's sharing being changed away from \"Anyone with the link can view\".
 
           Run details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 

@@ -1,0 +1,452 @@
+{
+"Filter": [
+{
+"children": [],
+"name": "Nasal Pivot"
+},
+{
+"children": [
+{
+"children": [],
+"name": "Whoop to Call (Falsetto Mix)"
+},
+{
+"children": [],
+"name": "Super Closed to whoop to closed to call"
+}
+],
+"name": "Acoustic Register Transitions"
+},
+{
+"children": [],
+"name": "Larynx Height Control"
+},
+{
+"children": [
+{
+"children": [],
+"name": "High Pharyngeal Narrowing"
+},
+{
+"children": [],
+"name": "Low Pharyngeal Narrowing"
+},
+{
+"children": [],
+"name": "PAN"
+},
+{
+"children": [],
+"name": "T1/T2"
+}
+],
+"name": "Narrowing Control"
+},
+{
+"children": [],
+"name": "Lip Position"
+},
+{
+"children": [],
+"name": "Tongue Position"
+},
+{
+"children": [],
+"name": "Jaw Position"
+},
+{
+"children": [
+{
+"children": [],
+"name": "Nasal"
+},
+{
+"children": [],
+"name": "Oral"
+},
+{
+"children": [],
+"name": "Laryngeal"
+}
+],
+"name": "Internal Activation"
+},
+{
+"children": [],
+"name": "Neck and Torso Bracing"
+},
+{
+"children": [],
+"name": "SOVTE’s"
+}
+],
+"Power": [
+{
+"children": [],
+"name": "Inhalation primer"
+},
+{
+"children": [],
+"name": "Developing a Respiratory Strategy"
+},
+{
+"children": [],
+"name": "Support Bracing"
+},
+{
+"children": [
+{
+"children": [],
+"name": "Open glottis"
+},
+{
+"children": [],
+"name": "Closed glottis"
+}
+],
+"name": "Breath holding"
+},
+{
+"children": [
+{
+"children": [
+{
+"children": [],
+"name": "Upper abs"
+},
+{
+"children": [],
+"name": "Lower abs"
+},
+{
+"children": [],
+"name": "Side abs"
+}
+],
+"name": "Finding the three support areas"
+},
+{
+"children": [
+{
+"children": [
+{
+"children": [],
+"name": "Weight"
+},
+{
+"children": [],
+"name": "Resonance"
+}
+],
+"name": "Volume Increases"
+},
+{
+"children": [],
+"name": "Closure Changes"
+}
+],
+"name": "Same Pitch"
+},
+{
+"children": [],
+"name": "Pitch Changes"
+},
+{
+"children": [],
+"name": "Register Change"
+},
+{
+"children": [
+{
+"children": [
+{
+"children": [],
+"name": "Repeat with /z/"
+},
+{
+"children": [],
+"name": "Repeat with /i/"
+}
+],
+"name": "/s/ sustained"
+},
+{
+"children": [
+{
+"children": [
+{
+"children": [],
+"name": "Repeat with /z/"
+},
+{
+"children": [],
+"name": "Repeat with /i/"
+}
+],
+"name": "Version 1: Maintain the same pitch"
+},
+{
+"children": [],
+"name": "Version 2: Glide up in pitch on a 3rd"
+}
+],
+"name": "/s/ quiet to loud to quiet"
+},
+{
+"children": [
+{
+"children": [],
+"name": "Repeat with /z/"
+},
+{
+"children": [],
+"name": "Repeat with /i/"
+}
+],
+"name": "/s/ quiet to high pressure quiet"
+},
+{
+"children": [
+{
+"children": [],
+"name": "Repeat with /z/"
+},
+{
+"children": [],
+"name": "Repeat with /i/"
+}
+],
+"name": "/s/ pulsed fricative"
+}
+],
+"name": "Fricatives to Phonation"
+}
+],
+"name": "Measuring Support Engagement and Movement"
+}
+],
+"Silent Practice Exercises": [
+{
+"children": [],
+"name": "Larynx Height Control"
+},
+{
+"children": [
+{
+"children": [],
+"name": "High Pharyngeal Narrowing"
+},
+{
+"children": [],
+"name": "Low Pharyngeal Narrowing"
+},
+{
+"children": [],
+"name": "Epiglottic Retroversion"
+}
+],
+"name": "Narrowing Control"
+},
+{
+"children": [],
+"name": "Lip Position"
+},
+{
+"children": [],
+"name": "Tongue Position"
+},
+{
+"children": [],
+"name": "Jaw Position"
+},
+{
+"children": [],
+"name": "Internal Activation"
+},
+{
+"children": [],
+"name": "Neck and Torso Bracing"
+},
+{
+"children": [],
+"name": "Inhalation primer"
+},
+{
+"children": [
+{
+"children": [],
+"name": "Open glottis"
+},
+{
+"children": [],
+"name": "Closed glottis"
+}
+],
+"name": "Breath holding"
+},
+{
+"children": [],
+"name": "Sustained Fricative (/s/)"
+},
+{
+"children": [],
+"name": "Pulsed Fricative"
+}
+],
+"Source": [
+{
+"children": [
+{
+"children": [],
+"name": "Atonal fry slide"
+},
+{
+"children": [
+{
+"children": [],
+"name": "Tight Overlay"
+},
+{
+"children": [],
+"name": "Non-Tight Overlay"
+}
+],
+"name": "Tonal fry slide"
+},
+{
+"children": [
+{
+"children": [],
+"name": "Same pitch transition from clean note to pure Fry without descending."
+},
+{
+"children": [],
+"name": "Atonal Fry lower then slide up into a clean note"
+},
+{
+"children": [],
+"name": "Atonal Fry higher then slide down into a clean note"
+},
+{
+"children": [],
+"name": "Same pitch transition from loose fry to tight fry."
+},
+{
+"children": [],
+"name": "Same pitch transition from falsetto: add loose fry & go to light modal."
+},
+{
+"children": [],
+"name": "Same pitch transition from clean note to atonal fry without descending."
+}
+],
+"name": "Fry transitions"
+}
+],
+"name": "Fry"
+},
+{
+"children": [
+{
+"children": [
+{
+"children": [],
+"name": "Glottal, Breathy, Balanced, Creaky"
+}
+],
+"name": "Cycling through the 4 onsets"
+},
+{
+"children": [],
+"name": "Glottal stops with increasing pressure"
+},
+{
+"children": [
+{
+"children": [],
+"name": "Glottal onsets and offsets"
+},
+{
+"children": [],
+"name": "Creak in between notes on a scale."
+},
+{
+"children": [],
+"name": "Breathy Onset across a scale."
+}
+],
+"name": "Onsets across a scale"
+}
+],
+"name": "Onsets/Offsets"
+},
+{
+"children": [],
+"name": "Hammer Vibrato"
+},
+{
+"children": [],
+"name": "Laryngeal vibrato"
+},
+{
+"children": [],
+"name": "Riffs/Runs"
+},
+{
+"children": [
+{
+"children": [],
+"name": "Whispering"
+},
+{
+"children": [],
+"name": "Whimper"
+},
+{
+"children": [],
+"name": "Stiff Overlay"
+},
+{
+"children": [],
+"name": "Grunting"
+},
+{
+"children": [],
+"name": "Distortion"
+}
+],
+"name": "False fold approximation"
+},
+{
+"children": [
+{
+"children": [
+{
+"children": [],
+"name": "Same Pitch"
+},
+{
+"children": [],
+"name": "Glides"
+}
+],
+"name": "Smooth"
+},
+{
+"children": [
+{
+"children": [],
+"name": "Same Pitch"
+},
+{
+"children": [],
+"name": "Glides"
+}
+],
+"name": "Abrupt"
+}
+],
+"name": "Transitions"
+}
+]
+}
