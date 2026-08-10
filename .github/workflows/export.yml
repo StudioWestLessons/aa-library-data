@@ -1,0 +1,64 @@
+name: Export AA Library from Notion
+
+on:
+  schedule:
+    # Daily, ~6:07am Pacific (13:07 UTC during PDT). Off the :00 mark per
+    # GitHub's cron guidance. The weekly sync-check in studio-west-resources
+    # runs 1h+ after this so a fresh Notion edit isn't flagged as drift.
+    - cron: '7 13 * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Export from Notion
+        id: export
+        run: |
+          output=$(python3 export_aa.py)
+          echo "$output"
+          echo "result=$(echo "$output" | head -1)" >> "$GITHUB_OUTPUT"
+          echo "summary=$(echo "$output" | tail -n +2)" >> "$GITHUB_OUTPUT"
+
+      - name: Commit updated data
+        if: steps.export.outputs.result == 'CHANGED'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add aa-library.json
+          git commit -m "Update AA library data from Notion: ${{ steps.export.outputs.summary }}"
+          git push
+
+      - name: Open an alert issue if the export broke
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # @mention + assignee so GitHub Mobile pushes this to Greg's phone
+          # (account-wide email delivery is broken; mobile push only fires for
+          # direct interactions). Don't remove them.
+          title="AA Library export is failing"
+          existing=$(gh issue list --repo "${{ github.repository }}" --state open \
+            --json number,title --jq ".[] | select(.title == \"$title\") | .number" | head -1)
+          body="@${{ github.repository_owner }} — the daily Notion → aa-library.json export failed. The site keeps showing the last good data, but it will NOT pick up new Notion edits until this is fixed.
+
+          Run details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+          Ask Claude (in a live session) to investigate."
+
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --repo "${{ github.repository }}" --body "$body"
+          else
+            gh issue create --repo "${{ github.repository }}" --title "$title" --body "$body" \
+              --assignee "${{ github.repository_owner }}"
+          fi
