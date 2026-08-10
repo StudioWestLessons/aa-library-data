@@ -39,6 +39,28 @@ jobs:
           git commit -m "Update AA library data from Notion: ${{ steps.export.outputs.summary }}"
           git push
 
+      - name: Heartbeat commit so GitHub never disables this schedule
+        if: steps.export.outputs.result == 'UNCHANGED'
+        run: |
+          # This repo is public, and GitHub disables scheduled workflows in
+          # public repos after 60 days without repository activity — and the
+          # warning email it sends first never arrives (email delivery to
+          # this account is broken account-wide). Data commits reset the
+          # clock, but they only happen when Notion changed; if the library
+          # has been quiet for 45+ days, commit a dated stamp instead so the
+          # daily export can never be switched off for inactivity.
+          last=$(git log -1 --format=%ct)
+          now=$(date +%s)
+          days=$(( (now - last) / 86400 ))
+          if [ "$days" -ge 45 ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            date -u +%Y-%m-%d > .heartbeat
+            git add .heartbeat
+            git commit -m "Heartbeat: keep the daily export schedule alive"
+            git push
+          fi
+
       - name: Open an alert issue if the export broke
         if: failure()
         env:
