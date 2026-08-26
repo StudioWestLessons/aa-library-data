@@ -351,7 +351,7 @@
 "children": [
 {
 "children": [],
-"name": "Glottal, Breathy, Balanced, Creaky"
+"name": "Glottal, Breathy, Balanced, Fry"
 }
 ],
 "name": "Cycling through the 4 onsets"
@@ -368,7 +368,7 @@
 },
 {
 "children": [],
-"name": "Creak in between notes on a scale."
+"name": "Fry in between notes on a scale."
 },
 {
 "children": [],
@@ -412,7 +412,7 @@
 },
 {
 "children": [],
-"name": "Distortion"
+"name": "Grit"
 }
 ],
 "name": "False fold approximation"
