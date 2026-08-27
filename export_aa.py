@@ -89,6 +89,18 @@ def query_rows(view_id):
             "searchQuery": "", "userTimeZone": "America/Los_Angeles",
         },
     })
+    # Guard against a silently truncated read. The old page-based exporter had
+    # to follow a cursor because Notion paginates page content at ~50 blocks,
+    # and four of the eight source pages really did paginate — a comparison
+    # that ignored it would have "found" ~92 videos missing that were merely on
+    # a later chunk. queryCollection returns everything under `limit`, but check
+    # rather than trust, because the library only grows.
+    result = data.get("result") or {}
+    if result.get("hasMore"):
+        raise RuntimeError(
+            "queryCollection reported hasMore — the library has outgrown the "
+            "single-request limit and this would publish a partial feed")
+
     rm = data.get("recordMap", {})
     collections = rm.get("collection", {})
     if not collections:
