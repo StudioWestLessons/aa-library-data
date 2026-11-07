@@ -1342,6 +1342,16 @@
 {
 "area": "Voice Qualities",
 "category": "Call — Twanged",
+"note": "Take special note of the G4’s on words like “began,” “sand,” etc",
+"source": "youtube",
+"start": 24,
+"url": "https://youtu.be/5svxuS3L9_s?si=CZJYRb9_jfje6KqY&t=24",
+"videoId": "5svxuS3L9_s",
+"voice": "Male"
+},
+{
+"area": "Voice Qualities",
+"category": "Call — Twanged",
 "note": "“AH” on the D5",
 "source": "youtube",
 "start": 68,
