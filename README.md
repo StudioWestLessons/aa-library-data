@@ -19,10 +19,11 @@ the content is exactly what's already publicly visible on the site.
 
 ## Adding a row in Notion (what the export expects)
 
-Greg types a Link, a Category, a Subcategory (when the category has them), a Voice
-and an optional Note. The export works out the rest: the website (YouTube, Instagram
-or TikTok) and the video id and start time from the Link, and the Area from the
-Category. The row's title ("Label (optional)") is free text and nothing reads it. A
+Greg types a Link, an Area, a Category, a Subcategory (when the category has them), a
+Voice and an optional Note. The export works out the rest: the website (YouTube,
+Instagram or TikTok) and the video id and start time from the Link. His Area is used
+as typed; if it contradicts the Category's usual Area the publish stops with a message,
+and a blank Area falls back to the Category's usual one. The row's title ("Label (optional)") is free text and nothing reads it. A
 row with no Link is treated as unfinished: it is left out and mentioned, it does not
 stop the export. The database has a "Check" column that says OK or what to fix, and
 an "Add here (newest first)" view; both are for Greg's eyes, the export ignores them.

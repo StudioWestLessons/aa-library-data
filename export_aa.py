@@ -13,10 +13,12 @@ its parent page, so this needs no token and the workflow needs no secrets.
 OUTPUT SHAPE IS UNCHANGED: {area, category, voice, videoId, start, note,
 source, url}. `category` is "Category - Subcategory" composed here.
 
-WHAT GREG TYPES IN A NEW ROW (2026-11-07): Link, Category, Subcategory (when the
-category has them), Voice, and an optional Note. Everything else is worked out
-here: the website (Source) and the video id and start time from the Link, and the
-Area from the Category. The row's title is a free label that nothing reads.
+WHAT GREG TYPES IN A NEW ROW (2026-11-07): Link, Area, Category, Subcategory (when
+the category has them), Voice, and an optional Note. Everything else is worked out
+here: the website (Source) and the video id and start time from the Link. Area is
+Greg's to pick, and an Area that contradicts the Category's usual one stops the
+publish; a blank Area falls back to the Category's usual one. The row's title is a
+free label that nothing reads.
 A row with no Link is treated as unfinished: it is left out and mentioned, it does
 not stop the export.
 
