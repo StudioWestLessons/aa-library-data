@@ -24,6 +24,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The bulk-edit guard asks git when aa-library.json last changed.
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:

@@ -43,6 +43,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 from urllib.parse import parse_qs, urlparse
 
 COLLECTION_ID = "9f2747e1-bdf8-42bd-a91f-a4806a47c40c"
@@ -309,7 +310,7 @@ NEEDS_SUBTYPE = {("Voice Qualities", "Call"), ("Voice Qualities", "Whoop")}
 
 BULK_EDIT_MIN = 10              # this many existing rows changed...
 BULK_EDIT_WINDOW_MS = 120_000   # ...within this long, of each other
-SHRINK_LIMIT = 10               # or this many rows gone since the last export
+SHRINK_LIMIT = 2                # or more than this many rows gone since the last export (deleted, or Link cleared)
 
 ACCEPT_WORDS = ("1", "true", "yes")
 
@@ -339,19 +340,47 @@ def _record_key(r):
     return json.dumps(r, sort_keys=True, ensure_ascii=False)
 
 
-def check_bulk_edit(records, meta, old_records):
+def last_publish_ms():
+    """When aa-library.json last changed, from git. Rows not edited since then
+    cannot be what changed the feed, which is what keeps a harmless rename of a
+    dropdown option from looking like a bulk edit. None if git cannot say."""
+    try:
+        out = subprocess.run(
+            ["git", "log", "-1", "--format=%ct", "--", "aa-library.json"],
+            cwd=os.path.dirname(os.path.abspath(__file__)),
+            capture_output=True, text=True, timeout=20, check=True).stdout.strip()
+        return int(out) * 1000 if out else None
+    except Exception:
+        return None
+
+
+def _link_key(r):
+    return (r["videoId"] or r["url"], r["start"])
+
+
+def check_bulk_edit(records, meta, old_records, since_ms=None):
     """Existing rows whose published content would change, many at once.
-    Catches a fill-down on ANY column. Ignores rows made recently (Greg typing a
-    new row), rows whose content is already published (the repair after a bad
-    edit), and renames of a dropdown option (which change no row's edit time)."""
+    Catches a fill-down on ANY column. Not counted: rows whose content is already
+    published (the repair after a bad edit), brand-new rows (made within a day of
+    the edit AND with a video and time never published before, so Greg typing a new
+    row), and renames of a dropdown option (which do not touch a row's edit time).
+    A row made a few hours ago whose video and time ARE already published is an
+    existing row and is counted. Only rows edited since the feed last changed
+    (`since_ms`) can have changed it; if git cannot say, the last 14 days."""
+    if since_ms is None:
+        since_ms = int(time.time() * 1000) - 14 * 86_400_000
     already = collections.Counter(_record_key(r) for r in old_records)
+    published_links = {_link_key(r) for r in old_records}
     times = []
     for r, m in zip(records, meta):
         k = _record_key(r)
         if already[k] > 0:
             already[k] -= 1
             continue
-        if m["created"] > m["edited"] - 86_400_000:
+        if m["edited"] <= since_ms:
+            continue
+        recent = m["created"] > m["edited"] - 86_400_000
+        if recent and _link_key(r) not in published_links:
             continue
         times.append(m["edited"])
     times.sort()
@@ -367,7 +396,7 @@ def check_bulk_edit(records, meta, old_records):
     return None
 
 
-def fatal_problems(records, meta, old_records, problems):
+def fatal_problems(records, meta, old_records, problems, since_ms=None):
     fatal = []
     if problems:
         shown = problems[:8]
@@ -382,9 +411,10 @@ def fatal_problems(records, meta, old_records, problems):
         if old_records:
             if len(records) < len(old_records) - SHRINK_LIMIT:
                 fatal.append(f"{len(old_records) - len(records)} fewer examples than the "
-                             "last export. If rows were deleted on purpose, run this "
-                             "workflow by hand and tick 'accept bulk changes'")
-            msg = check_bulk_edit(records, meta, old_records)
+                             "last export (rows deleted, or their Link cleared). If that is "
+                             "on purpose, run this workflow by hand and tick 'accept bulk changes'")
+            msg = check_bulk_edit(records, meta, old_records,
+                                  since_ms if since_ms is not None else last_publish_ms())
             if msg:
                 fatal.append(msg)
     return fatal

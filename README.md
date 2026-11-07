@@ -36,8 +36,8 @@ The site keeps its last good data and an alert issue opens with the reason in it
 1. A row that cannot be published as written (the message names the row).
 2. A subcategory under the wrong category, for example Husky under Call. The table is
    `SUB_PARENT` in `export_aa.py`; if a parent is renamed on purpose, update it.
-3. Many existing rows changed within two minutes (a Notion fill-down), or 10+ examples
-   gone since the last export. If that is intended, run the workflow by hand and tick
+3. Ten or more existing rows changed within two minutes (a Notion fill-down), or more
+   than two examples gone since the last export (deleted, or their Link cleared). If that is intended, run the workflow by hand and tick
    "accept bulk changes".
 
 Background: on 2026-11-07 a fill-down set 50 rows to Category "Call", 34 of them
