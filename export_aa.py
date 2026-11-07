@@ -341,15 +341,21 @@ def _record_key(r):
 
 
 def last_publish_ms():
-    """When aa-library.json last changed, from git. Rows not edited since then
+    """When aa-library.json last changed, from git, less an hour of margin (the
+    commit lands a minute after Notion was read). Rows not edited since then
     cannot be what changed the feed, which is what keeps a harmless rename of a
-    dropdown option from looking like a bulk edit. None if git cannot say."""
+    dropdown option from looking like a bulk edit. None if git cannot say: no git,
+    or a shallow checkout, where `git log` would report the newest commit rather
+    than the one that last touched the file."""
+    here = os.path.dirname(os.path.abspath(__file__))
     try:
-        out = subprocess.run(
-            ["git", "log", "-1", "--format=%ct", "--", "aa-library.json"],
-            cwd=os.path.dirname(os.path.abspath(__file__)),
-            capture_output=True, text=True, timeout=20, check=True).stdout.strip()
-        return int(out) * 1000 if out else None
+        shallow = subprocess.run(["git", "rev-parse", "--is-shallow-repository"], cwd=here,
+                                 capture_output=True, text=True, timeout=20, check=True).stdout.strip()
+        if shallow != "false":
+            return None
+        out = subprocess.run(["git", "log", "-1", "--format=%ct", "--", "aa-library.json"], cwd=here,
+                             capture_output=True, text=True, timeout=20, check=True).stdout.strip()
+        return int(out) * 1000 - 3_600_000 if out else None
     except Exception:
         return None
 
