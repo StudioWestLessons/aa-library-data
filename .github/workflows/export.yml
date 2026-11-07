@@ -6,7 +6,14 @@ on:
     # GitHub's cron guidance. The weekly sync-check in studio-west-resources
     # runs 1h+ after this so a fresh Notion edit isn't flagged as drift.
     - cron: '7 13 * * *'
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      accept_bulk_changes:
+        description: >-
+          Tick only if the export stopped because many rows changed at once (or
+          examples were deleted) and that change is what you meant to do.
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -24,19 +31,35 @@ jobs:
 
       - name: Export from Notion
         id: export
+        env:
+          # A scheduled run has no inputs, so this is empty there.
+          AA_ACCEPT_BULK_CHANGES: ${{ inputs.accept_bulk_changes && '1' || '' }}
         run: |
-          output=$(python3 export_aa.py)
+          # `output=$(cmd)` alone would exit under bash -e before anything was
+          # printed or saved, so a failure lost its reason. Capture the status,
+          # print the text, write the outputs, THEN exit with the status.
+          status=0
+          output=$(python3 export_aa.py) || status=$?
           echo "$output"
-          echo "result=$(echo "$output" | head -1)" >> "$GITHUB_OUTPUT"
-          echo "summary=$(echo "$output" | tail -n +2)" >> "$GITHUB_OUTPUT"
+          {
+            echo "result=$(echo "$output" | head -1)"
+            echo "summary<<AA_SUMMARY_EOF"
+            echo "$output" | tail -n +2
+            echo "AA_SUMMARY_EOF"
+          } >> "$GITHUB_OUTPUT"
+          exit "$status"
 
       - name: Commit updated data
         if: steps.export.outputs.result == 'CHANGED'
+        env:
+          # Notion-derived text goes through the environment, never straight
+          # into the shell command, so a stray quote in a category name is inert.
+          SUMMARY: ${{ steps.export.outputs.summary }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add aa-library.json
-          git commit -m "Update AA library data from Notion: ${{ steps.export.outputs.summary }}"
+          git commit -m "Update AA library data from Notion" -m "$SUMMARY"
           # Two exports write to this repo (AA at 13:07, exercises at 13:23);
           # rebase first so a same-window commit from the other one can't
           # turn this into a rejected push.
@@ -70,6 +93,7 @@ jobs:
         if: failure()
         env:
           GH_TOKEN: ${{ github.token }}
+          REASON: ${{ steps.export.outputs.summary }}
         run: |
           # @mention + assignee so GitHub Mobile pushes this to Greg's phone
           # (account-wide email delivery is broken; mobile push only fires for
@@ -77,7 +101,13 @@ jobs:
           title="AA Library export is failing"
           existing=$(gh issue list --repo "${{ github.repository }}" --state open \
             --json number,title --jq ".[] | select(.title == \"$title\") | .number" | head -1)
-          body="@${{ github.repository_owner }} — the daily Notion → aa-library.json export failed. The site keeps showing the last good data, but it will NOT pick up new Notion edits until this is fixed.
+          body="@${{ github.repository_owner }} - the daily Notion to aa-library.json export stopped. The site keeps showing the last good data, but it will NOT pick up new Notion edits until this is sorted out.
+
+          Why it stopped:
+
+          ${REASON:-(no reason was captured; see the run log)}
+
+          If this says rows are filed wrong or changed all at once, open the Notion library, fix or undo them, and the next daily run publishes by itself. (The Monday sync check may also open its own issue about the same thing. That is expected; this is the one that explains it.)
 
           Run details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 

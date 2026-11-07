@@ -3,50 +3,59 @@ Exports Greg's Notion source for the Auditive Analysis Library to
 aa-library.json, which studiowestlessons.com/aasoundlibrary fetches on
 every page load (with the page's embedded copy as offline fallback).
 
-SOURCE CHANGED 2026-08-26. This used to walk eight nested Notion PAGES and
-infer each item's category from how deeply the block was indented. That was
-fragile and it broke: an unrelated edit flattened the indentation on the
-Sound Elements page, every sub-category lost its parent, and the export
-published "Loose" where it meant "Closure — Loose", and merged
-"Resonance — Medium" with "Energy — Medium". Nothing warned, because the
-item count was still exactly 449.
-
-The library now lives in a Notion DATABASE, where Area / Category /
-Subcategory are dropdown columns. The structure is in the data, not in the
-whitespace, so there is nothing left to flatten.
+The library lives in a Notion DATABASE (one row per example). Read anonymously
+through the public notion.site API: the database inherits public sharing from
+its parent page, so this needs no token and the workflow needs no secrets.
 
   database:   notion.so/5cfc4eade0e64ba185800a9e150a70b4
   collection: 9f2747e1-bdf8-42bd-a91f-a4806a47c40c
 
-Read anonymously through the public notion.site API — the database inherits
-public sharing from its parent page, so this needs no token and the workflow
-needs no new secrets.
+OUTPUT SHAPE IS UNCHANGED: {area, category, voice, videoId, start, note,
+source, url}. `category` is "Category - Subcategory" composed here.
 
-OUTPUT IS UNCHANGED: the same record shape the site has always consumed,
-{area, category, voice, videoId, start, note, source, url}. `category` is
-still "Parent — Child", composed here from the two columns.
+WHAT GREG TYPES IN A NEW ROW (2026-11-07): Link, Category, Subcategory (when the
+category has them), Voice, and an optional Note. Everything else is worked out
+here: the website (Source) and the video id and start time from the Link, and the
+Area from the Category. The row's title is a free label that nothing reads.
+A row with no Link is treated as unfinished: it is left out and mentioned, it does
+not stop the export.
 
-Prints "CHANGED", "UNCHANGED" or "ERROR" as the first line of stdout, writes
-the file when changed, and exits non-zero on ERROR so the workflow fails and
-opens an alert issue.
+THREE THINGS CAN STOP A PUBLISH (the site then keeps its last good data and an
+alert issue opens with the reason in it):
+  1. A row that cannot be published as written (bad Link, no Category, an Area
+     that contradicts the Category). The message names the row.
+  2. A subcategory filed under the wrong category (e.g. Husky under Call).
+  3. A bulk edit: many existing rows changed inside two minutes. On 2026-11-07 a
+     fill-down in the Notion table set 50 rows to "Call" and 34 of them were
+     Breathy, Closed, Dopey, Flowy and Lamented examples; the old checks only
+     counted rows, so nothing noticed. If a block edit is intended, run the
+     workflow by hand and tick "accept bulk changes".
 
-Mirrored in studio-west-resources/aa-library/sync_check.py. Change both.
+Prints "CHANGED", "UNCHANGED" or "ERROR" as the first line of stdout, then
+detail lines. Writes the file when changed and exits non-zero on ERROR.
+
+The row-reading section between the SHARED markers is mirrored in
+studio-west-resources/aa-library/sync_check.py. Change both together.
 """
+import collections
 import json
 import os
 import re
 import subprocess
 import sys
+from urllib.parse import parse_qs, urlparse
 
 COLLECTION_ID = "9f2747e1-bdf8-42bd-a91f-a4806a47c40c"
-DB_PAGE_ID = "5cfc4ead-e0e6-4ba1-8580-0a9e150a70b4"
+# The "Default view" of the database. Pinned on purpose: views added later (for
+# example a filtered "Needs fixing" tab) must never change which rows are read.
+VIEW_ID = "aee2d120-89b7-47d7-9aa8-1a0e6429c047"
 NOTION_SITE = "https://climbing-van-64a.notion.site"
 
 OUT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "aa-library.json")
 UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
 
-# The 6 Areas order, as the chart and the site present it — NOT alphabetical.
+# The 6 Areas order, as the chart and the site present it, NOT alphabetical.
 AREA_ORDER = [
     "Registers", "Sound Elements", "Voice Qualities", "Vocal Overlays",
     "Distortions", "Special Techniques", "Transitions", "Extra",
@@ -55,6 +64,10 @@ VOICE_ORDER = ["Male", "Female"]
 
 EXPECTED_MIN = 400          # refuse to publish a suspiciously short read
 
+DASH = " — "           # the separator the page splits "Category - Subcategory" on
+
+
+# ===================== BEGIN SHARED WITH sync_check.py =====================
 
 def post(endpoint, payload):
     cmd = [
@@ -66,45 +79,30 @@ def post(endpoint, payload):
     return json.loads(out)
 
 
-def load_view_id():
-    """The collection_view id, needed to query the collection."""
-    data = post("loadPageChunk", {
-        "pageId": DB_PAGE_ID, "limit": 50, "cursor": {"stack": []},
-        "chunkNumber": 0, "verticalColumns": False,
-    })
-    views = data.get("recordMap", {}).get("collection_view", {})
-    if not views:
-        raise RuntimeError(
-            "no collection_view on the database page — is it still shared publicly?")
-    return next(iter(views))
-
-
-def query_rows(view_id):
+def query_rows():
     data = post("queryCollection", {
         "collection": {"id": COLLECTION_ID},
-        "collectionView": {"id": view_id},
+        "collectionView": {"id": VIEW_ID},
         "loader": {
             "type": "reducer",
             "reducers": {"collection_group_results": {"type": "results", "limit": 5000}},
             "searchQuery": "", "userTimeZone": "America/Los_Angeles",
         },
     })
-    # Guard against a silently truncated read. The old page-based exporter had
-    # to follow a cursor because Notion paginates page content at ~50 blocks,
-    # and four of the eight source pages really did paginate — a comparison
-    # that ignored it would have "found" ~92 videos missing that were merely on
-    # a later chunk. queryCollection returns everything under `limit`, but check
-    # rather than trust, because the library only grows.
+    # queryCollection returns everything under `limit`, but check rather than
+    # trust: a silently truncated read would publish a partial library.
     result = data.get("result") or {}
     if result.get("hasMore"):
         raise RuntimeError(
-            "queryCollection reported hasMore — the library has outgrown the "
+            "queryCollection reported hasMore: the library has outgrown the "
             "single-request limit and this would publish a partial feed")
 
     rm = data.get("recordMap", {})
     collections = rm.get("collection", {})
     if not collections:
-        raise RuntimeError("queryCollection returned no collection schema")
+        raise RuntimeError(
+            "queryCollection returned no collection schema (is the Default view "
+            "still there, and the database still shared publicly?)")
     schema = next(iter(collections.values()))["value"]["value"]["schema"]
     name_to_id = {v["name"]: k for k, v in schema.items()}
 
@@ -128,121 +126,317 @@ def text_of(block, name_to_id, field):
     return "".join(seg[0] for seg in prop if seg and isinstance(seg[0], str)).strip()
 
 
-def parse_link(url):
-    """Video id and start-seconds out of the link. The link is the single
-    source of truth for the timestamp — there is no separate start field."""
+class RowProblem(Exception):
+    """A row that cannot be published as written. The message is for Greg."""
+
+
+def _host(url):
+    return (urlparse(url).netloc or "").lower()
+
+
+def _is_youtube(host):
+    return (host == "youtu.be" or host.endswith(".youtu.be")
+            or host == "youtube.com" or host.endswith(".youtube.com")
+            or host == "youtube-nocookie.com" or host.endswith(".youtube-nocookie.com"))
+
+
+def normalise_link(raw):
+    """The address as typed, minus stray end spaces, with https:// added if he
+    left it off. Text after the address (a note pasted into the Link cell) is a
+    problem, not something to guess around."""
+    url = (raw or "").strip()
+    if not url:
+        return ""
+    if re.search(r"\s", url):
+        raise RowProblem("the Link has extra text after the web address; keep the "
+                         "address alone in Link and put words in Note")
+    if not re.match(r"^[A-Za-z][A-Za-z0-9+.-]*://", url):
+        url = "https://" + url
+    return url
+
+
+def detect_source(url):
+    host = _host(url)
+    if _is_youtube(host):
+        return "youtube"
+    if host.endswith("instagram.com"):
+        return "instagram"
+    if host.endswith("tiktok.com"):
+        return "tiktok"
+    raise RowProblem("the Link is not a YouTube, Instagram or TikTok address")
+
+
+def parse_seconds(token):
+    """66, 66s or 66.5 -> 66. Anything else is not understood (None)."""
+    m = re.fullmatch(r"(\d+)(?:\.\d+)?s?", token.strip().lower())
+    return int(m.group(1)) if m else None
+
+
+def parse_youtube(url):
+    """(video id, start seconds) from a YouTube address."""
+    u = urlparse(url)
+    host = u.netloc.lower()
+    q = {k.lower(): v for k, v in parse_qs(u.query).items()}
     vid = None
-    for pat in (r"youtu\.be/([A-Za-z0-9_-]{6,})",
-                r"[?&]v=([A-Za-z0-9_-]{6,})",
-                r"/shorts/([A-Za-z0-9_-]{6,})",
-                r"/embed/([A-Za-z0-9_-]{6,})"):
-        m = re.search(pat, url)
-        if m:
-            vid = m.group(1)
+    if host.endswith("youtu.be"):
+        seg = [p for p in u.path.split("/") if p]
+        vid = seg[0] if seg else None
+    elif u.path.rstrip("/") == "/watch":
+        vid = (q.get("v") or [None])[0]
+    else:
+        m = re.match(r"^/(?:shorts|live|embed|v)/([^/?#]+)", u.path)
+        vid = m.group(1) if m else None
+    if not vid or not re.fullmatch(r"[A-Za-z0-9_-]{11}", vid):
+        raise RowProblem("that YouTube address has no 11-character video id "
+                         "(a playlist or channel address will not do)")
+    raw_t = None
+    for key in ("t", "start"):
+        if key in q:
+            raw_t = q[key][0]
             break
-    m = re.search(r"[?&](?:t|start)=(\d+)s?\b", url)
-    start = int(m.group(1)) if m else 0
+    if raw_t is None:
+        m = re.search(r"(?:^|[&])t=([^&]*)", u.fragment)
+        raw_t = m.group(1) if m else None
+    if raw_t is None:
+        return vid, 0
+    start = parse_seconds(raw_t)
+    if start is None:
+        raise RowProblem(f"the time in the Link ({raw_t!r}) is not plain seconds; "
+                         "use the address from YouTube's 'Copy video URL at current "
+                         "time', which ends in t=66")
     return vid, start
 
 
-def build_records():
-    rows, n2i = query_rows(load_view_id())
-    records = []
-    for b in rows:
-        cat = text_of(b, n2i, "Category")
-        sub = text_of(b, n2i, "Subcategory")
-        link = text_of(b, n2i, "Link")
-        source = text_of(b, n2i, "Source") or "youtube"
-        vid, start = parse_link(link)
-        records.append({
-            "area": text_of(b, n2i, "Area"),
-            "category": f"{cat} — {sub}" if sub else cat,
-            "voice": text_of(b, n2i, "Voice"),
-            "videoId": vid if source == "youtube" else None,
-            "start": start,
-            "note": text_of(b, n2i, "Note"),
-            "source": source,
-            "url": link,
-        })
+def row_label(b, n2i):
+    title = text_of(b, n2i, "Label (optional)") or text_of(b, n2i, "Example")
+    rid = b["id"].replace("-", "")
+    return f"'{title or 'untitled row'}' (notion.so/{rid})"
 
-    # A database has no inherent running order and the view came back
-    # scrambled, so impose one: 6 Areas order, then category, then Male
-    # before Female. Deterministic run to run, which matters because the
-    # workflow only commits when the JSON actually differs.
-    def key(r):
+
+def build_records(rows, n2i):
+    """Rows -> (records, meta, problems, skipped).
+
+    records  the feed records, sorted
+    meta     one dict per record: page id, label, created/edited time (for guards)
+    problems fatal, plain-English, each naming its row
+    skipped  labels of unfinished rows (no Link) left out
+    """
+    # Which Area each Category belongs to, from the rows that state it.
+    area_votes = collections.defaultdict(collections.Counter)
+    for b in rows:
+        a, c = text_of(b, n2i, "Area"), text_of(b, n2i, "Category")
+        if a and c:
+            area_votes[c][a] += 1
+
+    built, problems, skipped = [], [], []
+    for b in rows:
+        label = row_label(b, n2i)
+        raw_link = text_of(b, n2i, "Link")
+        if not raw_link.strip():
+            skipped.append(label)
+            continue
+        try:
+            cat = text_of(b, n2i, "Category")
+            sub = text_of(b, n2i, "Subcategory")
+            if not cat:
+                raise RowProblem("it has no Category")
+            link = normalise_link(raw_link)
+            source = detect_source(link)
+            vid, start = parse_youtube(link) if source == "youtube" else (None, 0)
+
+            area = text_of(b, n2i, "Area")
+            votes = area_votes.get(cat)
+            usual = votes.most_common(1)[0][0] if votes else None
+            if not area:
+                if not usual:
+                    raise RowProblem(f"{cat!r} is a new Category, so set this row's Area "
+                                     f"(one of: {', '.join(AREA_ORDER)})")
+                area = usual
+            elif area not in AREA_ORDER:
+                raise RowProblem(f"the Area {area!r} is not one of the 8 Areas")
+            elif usual and area != usual and votes[usual] >= 2:
+                raise RowProblem(f"{cat!r} is normally under {usual}, but this row says {area}")
+
+            built.append(({
+                "area": area,
+                "category": f"{cat}{DASH}{sub}" if sub else cat,
+                "voice": text_of(b, n2i, "Voice"),
+                "videoId": vid,
+                "start": start,
+                "note": text_of(b, n2i, "Note"),
+                "source": source,
+                "url": link,
+            }, {
+                "id": b["id"], "label": label,
+                "created": b.get("created_time") or 0,
+                "edited": b.get("last_edited_time") or 0,
+            }))
+        except RowProblem as e:
+            problems.append(f"{label}: {e}")
+
+    def key(rm):
+        r = rm[0]
         area_rank = AREA_ORDER.index(r["area"]) if r["area"] in AREA_ORDER else len(AREA_ORDER)
         voice_rank = VOICE_ORDER.index(r["voice"]) if r["voice"] in VOICE_ORDER else len(VOICE_ORDER)
         return (area_rank, r["category"], voice_rank, r["videoId"] or "", r["start"])
 
-    records.sort(key=key)
-    return records
+    built.sort(key=key)
+    return [r for r, _ in built], [m for _, m in built], problems, skipped
+
+# ====================== END SHARED WITH sync_check.py ======================
 
 
-def validate(records):
-    """Returns (fatal, warnings). The old exporter checked only the record
-    count, which is precisely why the flattening got through: the count stayed
-    at exactly 449 while half the categories lost their parent.
+# Subcategories that belong to exactly one category in the 6 Areas chart. Shared
+# ones (Medium, Balanced, Smooth, Abrupt...) are left out on purpose, and a
+# subcategory Greg invents is unconstrained. If he renames one of these PARENTS
+# on purpose, the export stops with a message saying so: update this table (or run
+# the workflow by hand with "accept bulk changes" ticked) and it carries on.
+SUB_PARENT = {
+    "Airy": {"Breathy"}, "Husky": {"Breathy"},
+    "Complain": {"Lamented"}, "Cry": {"Lamented"}, "Sob": {"Lamented"}, "Wail": {"Lamented"},
+    "Fry Scream": {"Scream"}, "Hybrid Scream": {"Scream"},
+    "Hammer": {"Vibrato"}, "Laryngeal": {"Vibrato"}, "Supported": {"Vibrato"},
+    "Yodel-brato": {"Vibrato"},
+    "T1 (Kermit)": {"Tongue Techniques"}, "T2 (Stitch)": {"Tongue Techniques"},
+    "T3 (Yarl)": {"Tongue Techniques"},
+    "Type 1": {"Riffs and Runs"}, "Type 2": {"Riffs and Runs"}, "Type 3 (a)": {"Riffs and Runs"},
+    "Type 3 (b)": {"Riffs and Runs"}, "Type 4": {"Riffs and Runs"}, "Type 5": {"Riffs and Runs"},
+    "Reinforced Falsetto": {"Falsetto"}, "Falsetto Mix": {"Mix"}, "Modal Mix": {"Mix"},
+    "Spacious": {"Call", "Whoop"}, "Twanged": {"Call", "Whoop"},
+}
+# Per the chart these Voice Quality families exist only as their subtypes.
+NEEDS_SUBTYPE = {("Voice Qualities", "Call"), ("Voice Qualities", "Whoop")}
 
-    Fatal = structural, the thing that broke before. Warnings = real gaps in
-    the library worth surfacing but not worth withholding the whole feed for.
-    """
+BULK_EDIT_MIN = 10              # this many existing rows changed...
+BULK_EDIT_WINDOW_MS = 120_000   # ...within this long, of each other
+SHRINK_LIMIT = 10               # or this many rows gone since the last export
+
+ACCEPT_WORDS = ("1", "true", "yes")
+
+
+def accepting():
+    return os.environ.get("AA_ACCEPT_BULK_CHANGES", "").strip().lower() in ACCEPT_WORDS
+
+
+def check_taxonomy(records):
+    problems = collections.Counter()
+    for r in records:
+        cat, _, sub = r["category"].partition(DASH)
+        if sub in SUB_PARENT and cat not in SUB_PARENT[sub]:
+            problems[f"{r['area']}: {sub!r} is filed under {cat!r} (it belongs under "
+                     f"{' or '.join(sorted(SUB_PARENT[sub]))})"] += 1
+        if (r["area"], cat) in NEEDS_SUBTYPE and not sub:
+            problems[f"{r['area']}: {cat!r} needs a Subcategory (Spacious or Twanged)"] += 1
+    if not problems:
+        return None
+    shown = "; ".join(f"{n} row(s): {p}" for p, n in problems.most_common(5))
+    return (f"{sum(problems.values())} example(s) look filed in the wrong place. {shown}. "
+            "If a category was renamed on purpose, the SUB_PARENT table in export_aa.py "
+            "needs the new name")
+
+
+def _record_key(r):
+    return json.dumps(r, sort_keys=True, ensure_ascii=False)
+
+
+def check_bulk_edit(records, meta, old_records):
+    """Existing rows whose published content would change, many at once.
+    Catches a fill-down on ANY column. Ignores rows made recently (Greg typing a
+    new row), rows whose content is already published (the repair after a bad
+    edit), and renames of a dropdown option (which change no row's edit time)."""
+    already = collections.Counter(_record_key(r) for r in old_records)
+    times = []
+    for r, m in zip(records, meta):
+        k = _record_key(r)
+        if already[k] > 0:
+            already[k] -= 1
+            continue
+        if m["created"] > m["edited"] - 86_400_000:
+            continue
+        times.append(m["edited"])
+    times.sort()
+    best, run = 0, 0
+    for i, t in enumerate(times):
+        run = run + 1 if i and t - times[i - 1] <= BULK_EDIT_WINDOW_MS else 1
+        best = max(best, run)
+    if best >= BULK_EDIT_MIN:
+        return (f"{best} existing examples were changed inside two minutes. That is the "
+                "shape of an accidental fill-down in the Notion table, so nothing was "
+                "published. Look at the most recently edited rows in Notion. If the "
+                "change is intended, run this workflow by hand and tick 'accept bulk changes'")
+    return None
+
+
+def fatal_problems(records, meta, old_records, problems):
     fatal = []
-    warnings = []
-
+    if problems:
+        shown = problems[:8]
+        more = f" (and {len(problems) - 8} more)" if len(problems) > 8 else ""
+        fatal.append("Rows that cannot be published as written:\n  - " + "\n  - ".join(shown) + more)
     if len(records) < EXPECTED_MIN:
-        fatal.append(f"only {len(records)} items — far below the expected ~449")
+        fatal.append(f"only {len(records)} items, far below the expected ~449")
+    if not accepting():
+        msg = check_taxonomy(records)
+        if msg:
+            fatal.append(msg)
+        if old_records:
+            if len(records) < len(old_records) - SHRINK_LIMIT:
+                fatal.append(f"{len(old_records) - len(records)} fewer examples than the "
+                             "last export. If rows were deleted on purpose, run this "
+                             "workflow by hand and tick 'accept bulk changes'")
+            msg = check_bulk_edit(records, meta, old_records)
+            if msg:
+                fatal.append(msg)
+    return fatal
 
-    for field, label in (("area", "area"), ("category", "category"), ("url", "link")):
-        missing = [r for r in records if not r[field]]
-        if missing:
-            fatal.append(f"{len(missing)} record(s) with no {label}")
 
-    bad_area = sorted({r["area"] for r in records if r["area"] and r["area"] not in AREA_ORDER})
-    if bad_area:
-        fatal.append(f"unrecognised area(s): {bad_area}")
-
-    yt_no_id = [r for r in records if r["source"] == "youtube" and not r["videoId"]]
-    if yt_no_id:
-        fatal.append(f"{len(yt_no_id)} youtube record(s) whose link yielded no video id")
-
-    # Long-standing gap: two "Acoustic Register induced 'vocal breaks'" items
-    # have never had a voice set, in the old pages or any published feed.
-    # Worth seeing, not worth blocking on.
+def warnings_for(records, skipped, old_records):
+    warnings = []
+    if skipped:
+        shown = ", ".join(skipped[:4]) + (" ..." if len(skipped) > 4 else "")
+        warnings.append(f"{len(skipped)} unfinished row(s) with no Link left out: {shown}")
     no_voice = [r for r in records if not r["voice"]]
     if no_voice:
         where = ", ".join(sorted({f"{r['area']}/{r['category']}" for r in no_voice}))
         warnings.append(f"{len(no_voice)} record(s) with no voice ({where})")
-
-    # A category that exists in only one area but with no sub-category, where
-    # sibling categories all have one, is the shape the flattening produced.
-    bare = sorted({r["category"] for r in records if " — " not in r["category"]})
-    warnings.append(f"{len(bare)} categories carry no sub-category (expected ~30)")
-
-    return fatal, warnings
+    dupes = [k for k, n in collections.Counter(
+        (r["category"], r["voice"], r["videoId"] or r["url"], r["start"]) for r in records).items() if n > 1]
+    if dupes:
+        warnings.append(f"{len(dupes)} example(s) entered twice (same video, time, voice, category)")
+    if not old_records:
+        warnings.append("no previous feed to compare with, so the bulk-edit check was skipped")
+    return warnings
 
 
 def main():
     try:
-        records = build_records()
+        rows, n2i = query_rows()
+        records, meta, problems, skipped = build_records(rows, n2i)
     except Exception as e:
         print("ERROR")
         print(f"Notion extraction failed: {e}")
         sys.exit(1)
 
-    fatal, warnings = validate(records)
-    if fatal:
-        print("ERROR")
-        print("Refusing to publish. " + "; ".join(fatal))
-        sys.exit(1)
-
-    new_json = json.dumps(records, ensure_ascii=False, sort_keys=True, indent=0)
-
-    old_json = None
+    old_json, old_records = None, []
     if os.path.exists(OUT_PATH):
         with open(OUT_PATH, encoding="utf-8") as f:
             old_json = f.read()
+        try:
+            old_records = json.loads(old_json)
+        except ValueError:
+            old_records = []
 
-    note = ("  [" + "; ".join(warnings) + "]") if warnings else ""
+    fatal = fatal_problems(records, meta, old_records, problems)
+    if fatal:
+        print("ERROR")
+        print("Not published. The site keeps showing the last good data.")
+        for line in fatal:
+            print(line)
+        sys.exit(1)
+
+    new_json = json.dumps(records, ensure_ascii=False, sort_keys=True, indent=0)
+    notes = warnings_for(records, skipped, old_records)
+    note = ("  [" + "; ".join(notes) + "]") if notes else ""
 
     if old_json == new_json:
         print("UNCHANGED")
