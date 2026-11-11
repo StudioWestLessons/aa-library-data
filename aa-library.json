@@ -2552,6 +2552,16 @@
 {
 "area": "Distortions",
 "category": "Growl",
+"note": "“down”",
+"source": "youtube",
+"start": 250,
+"url": "https://youtu.be/x6QZn9xiuOE?si=Uoc0PANuIgn99ASX&t=250",
+"videoId": "x6QZn9xiuOE",
+"voice": "Male"
+},
+{
+"area": "Distortions",
+"category": "Growl",
 "note": "“night”",
 "source": "youtube",
 "start": 1,
